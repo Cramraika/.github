@@ -53,7 +53,9 @@ jobs:
           if [ -f pyproject.toml ] && [ ! -f requirements.txt ]; then pip install -e . 2>/dev/null || true; fi
 
       - name: Lint (flake8 — fatal-error subset)
-        run: flake8 . --max-line-length=120 --count --select=E9,F63,F7 --show-source --statistics
+        # E9 (syntax), F63 (invalid comparisons), F7 (break/return misuse),
+        # F82 (undefined name) — the fleet fatal-error subset.
+        run: flake8 . --max-line-length=120 --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Security audit (pip-audit, advisory)
         continue-on-error: true
