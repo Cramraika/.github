@@ -57,7 +57,7 @@ their consumer repo, not here.
 
 ## Caller examples
 
-See `workflow-templates/` and the per-repo migration in
+See `examples/` (plain caller examples; the GitHub New-workflow UI does not source from a User-account .github repo) and the per-repo migration in
 `platform-docs/docs/specs/2026-06-26-uniform-ci-cd.md`.
 
 ## Secrets do NOT inherit automatically

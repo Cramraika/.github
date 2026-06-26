@@ -1,6 +1,0 @@
-{
-  "name": "Fleet Security Scan (reusable)",
-  "description": "Thin caller for Cramraika/.github security-scan.yml",
-  "iconName": "example",
-  "categories": ["Security"]
-}
