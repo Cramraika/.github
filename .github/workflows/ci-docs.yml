@@ -1,0 +1,61 @@
+# Reusable docs CI — lychee link-check + optional docs/design tier check.
+#
+#   jobs:
+#     docs:
+#       uses: Cramraika/.github/.github/workflows/ci-docs.yml@main
+#       with:
+#         runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+#         design-check: false   # true for Tier A/B design-surface repos with scripts/check-docs-design.sh
+name: Reusable Docs CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label."
+        required: false
+        type: string
+        default: ubuntu-latest
+      design-check:
+        description: "Run scripts/check-docs-design.sh (Tier A/B design-surface repos)."
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  docs:
+    name: Docs CI
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Link check (lychee)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Honor a repo-local lychee.toml if present; otherwise scan markdown.
+          args: --no-progress './**/*.md'
+          fail: true
+        continue-on-error: true
+
+      - name: Detect tier from CLAUDE.md
+        id: tier
+        if: ${{ inputs.design-check }}
+        run: |
+          tier=C
+          if [ -f CLAUDE.md ]; then
+            if grep -qE 'tier:\s*[Aa]|Tier A' CLAUDE.md; then tier=A
+            elif grep -qE 'tier:\s*[Bb]|Tier B' CLAUDE.md; then tier=B; fi
+          fi
+          echo "tier=$tier" >> "$GITHUB_OUTPUT"
+
+      - name: Docs/design check
+        if: ${{ inputs.design-check }}
+        run: |
+          if [ -f scripts/check-docs-design.sh ]; then
+            bash scripts/check-docs-design.sh --tier ${{ steps.tier.outputs.tier }}
+          else
+            echo "No scripts/check-docs-design.sh — skipping."
+          fi

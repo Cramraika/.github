@@ -1,0 +1,21 @@
+# Composite action: gitleaks secret scan
+# Used by every reusable CI workflow so secret-scanning is uniform fleet-wide.
+# Mirrors the per-commit gitleaks hook (OW-308 fleet pre-commit primitive) into CI.
+name: secret-scan
+description: Run gitleaks over the working tree to catch committed secrets.
+
+inputs:
+  fetch-depth:
+    description: "Checkout depth (0 = full history for full-history scan)."
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: gitleaks scan
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        # No GITLEAKS_LICENSE needed for personal/User-account public+private repos.
+        GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+        GITLEAKS_ENABLE_SUMMARY: "true"

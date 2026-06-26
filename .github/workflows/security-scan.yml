@@ -1,0 +1,84 @@
+# Reusable security scan — Trivy fs CVE scan (advisory, SARIF -> Code Scanning)
+# + gitleaks secret scan. Per ADR-041 (Trivy + Cosign deploy gate).
+#
+#   jobs:
+#     security:
+#       uses: Cramraika/.github/.github/workflows/security-scan.yml@main
+#       with:
+#         runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+#         blocking: false       # advisory mode; flip true to gate on HIGH+CRITICAL
+#
+# Advisory by default (exit-code 0) so findings surface in Code Scanning without
+# blocking merges. Tightening path: add .trivyignore allowlist (mandatory
+# `# expires=YYYY-MM-DD`) -> flip blocking: true after baseline clean.
+name: Reusable Security Scan
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label."
+        required: false
+        type: string
+        default: ubuntu-latest
+      blocking:
+        description: "Gate the merge on HIGH+CRITICAL CVEs (exit-code 1)."
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  security-events: write   # upload SARIF to Code Scanning
+
+jobs:
+  security:
+    name: Security scan
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # NOTE: the composite actions under .github/actions/ are resolved from the
+      # CALLER's checkout, which does NOT vendor them. So this reusable workflow
+      # invokes the underlying tools directly to stay self-contained. The
+      # composites are documentation/convention helpers for repos that DO vendor them.
+      - name: gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
+          GITLEAKS_ENABLE_SUMMARY: "true"
+
+      - name: Trivy fs scan (table, advisory)
+        uses: aquasecurity/trivy-action@0.36.0
+        continue-on-error: true
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: table
+          exit-code: ${{ inputs.blocking && '1' || '0' }}
+
+      - name: Trivy fs scan (SARIF)
+        uses: aquasecurity/trivy-action@0.36.0
+        continue-on-error: true
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "0"
+
+      - name: Upload Trivy SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-fs

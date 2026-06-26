@@ -1,0 +1,16 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  ci:
+    uses: Cramraika/.github/.github/workflows/ci-node.yml@main
+    with:
+      runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+      node-version: "20"
+    secrets: inherit

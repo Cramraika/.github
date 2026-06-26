@@ -1,0 +1,39 @@
+# Composite action: dependency cache + toolchain setup
+# Sets up the language toolchain WITH built-in dependency caching, so each
+# reusable CI workflow doesn't re-declare the setup+cache boilerplate.
+name: cache-deps
+description: Set up a language toolchain with dependency caching.
+
+inputs:
+  language:
+    description: "One of: python | node."
+    required: true
+  python-version:
+    description: "Python version (when language=python)."
+    required: false
+    default: "3.11"
+  node-version:
+    description: "Node version (when language=node)."
+    required: false
+    default: "20"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      if: inputs.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+        # setup-python caches pip when a requirements file is present; tolerate absence.
+        cache: pip
+        cache-dependency-path: |
+          **/requirements*.txt
+          **/pyproject.toml
+
+    - name: Set up Node
+      if: inputs.language == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm

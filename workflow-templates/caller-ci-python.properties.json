@@ -1,0 +1,6 @@
+{
+  "name": "Fleet CI — Python (reusable)",
+  "description": "Thin caller for Cramraika/.github ci-python.yml",
+  "iconName": "example",
+  "categories": ["Continuous integration", "Python"]
+}

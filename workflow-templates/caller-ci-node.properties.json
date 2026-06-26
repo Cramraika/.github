@@ -1,0 +1,6 @@
+{
+  "name": "Fleet CI — Node (reusable)",
+  "description": "Thin caller for Cramraika/.github ci-node.yml",
+  "iconName": "example",
+  "categories": ["Continuous integration", "JavaScript"]
+}

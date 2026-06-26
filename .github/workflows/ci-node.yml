@@ -1,0 +1,82 @@
+# Reusable Node CI — call from a thin per-repo caller:
+#
+#   jobs:
+#     ci:
+#       uses: Cramraika/.github/.github/workflows/ci-node.yml@main
+#       with:
+#         runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+#         node-version: "20"
+#         run-tests: true
+#         docker-build: false
+#       secrets: inherit
+#
+# Preserves the project-template ci-node behavior (tolerant install, build --if-present,
+# CI: false so CRA-style warnings don't fail the build).
+name: Reusable Node CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label (caller resolves vars.RUNNER_TYPE || 'ubuntu-latest')."
+        required: false
+        type: string
+        default: ubuntu-latest
+      node-version:
+        description: "Node version."
+        required: false
+        type: string
+        default: "20"
+      run-tests:
+        description: "Run `npm test` (skips gracefully if no test script)."
+        required: false
+        type: boolean
+        default: true
+      docker-build:
+        description: "Run a no-push docker build smoke if a Dockerfile exists."
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  ci:
+    name: Node CI
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install dependencies
+        run: npm install --no-audit --prefer-offline 2>/dev/null || npm install --legacy-peer-deps --no-audit
+
+      - name: Build
+        run: npm run build --if-present
+        env:
+          CI: false
+
+      - name: Test
+        if: ${{ inputs.run-tests }}
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)" 2>/dev/null; then
+            npm test
+          else
+            echo "No test script — skipping."
+          fi
+
+      - name: npm audit (high+, advisory)
+        continue-on-error: true
+        run: npm audit --audit-level=high 2>&1 | tail -30 || true
+
+      - name: Docker build smoke (no push)
+        if: ${{ inputs.docker-build }}
+        run: |
+          if [ -f Dockerfile ]; then
+            docker build -t ci-smoke:${{ github.sha }} .
+          else
+            echo "No Dockerfile — skipping docker build smoke."
+          fi

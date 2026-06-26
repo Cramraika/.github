@@ -1,0 +1,16 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  ci:
+    uses: Cramraika/.github/.github/workflows/ci-python.yml@main
+    with:
+      runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+      python-version: "3.11"
+    secrets: inherit

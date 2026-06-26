@@ -1,0 +1,15 @@
+name: Security
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    - cron: '0 6 * * 1'
+jobs:
+  security:
+    uses: Cramraika/.github/.github/workflows/security-scan.yml@main
+    with:
+      runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+      blocking: false
+    secrets: inherit

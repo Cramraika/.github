@@ -1,0 +1,35 @@
+# Composite action: runner-select (documentation + echo helper)
+# The ACTUAL runner selection happens caller-side (a reusable workflow cannot
+# read the caller's `vars.RUNNER_TYPE` reliably from inside `runs-on`). The
+# canonical caller pattern is:
+#
+#   jobs:
+#     ci:
+#       uses: Cramraika/.github/.github/workflows/ci-node.yml@main
+#       with:
+#         runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+#
+# Fail-safe default is 'ubuntu-latest' (NOT 'self-hosted'): on this User account
+# self-hosted runners are repo-scoped and only 5 repos have one registered
+# (vps-ansible, host_page, vagary-voice, vagary-platform, unified-journey-guide).
+# A `runs-on: self-hosted` on a repo with no runner hangs forever, so the
+# fleet-safe fallback is the GitHub-hosted runner.
+#
+# DEPLOY workflows that NEED the Mac substrate (SSH key + core-1 reachability)
+# HARD-PIN `runs-on: self-hosted` and do NOT accept a runner input — a repo var
+# must never be able to re-break the deploy bridge (root cause of the
+# 2026-05-31 -> 06-04 host_page deploy outage).
+name: runner-select
+description: Echo the resolved runner for traceability (selection is caller-side).
+
+inputs:
+  runner:
+    description: "The runner label resolved by the caller."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Echo resolved runner
+      shell: bash
+      run: 'echo "Running on runner label - ${{ inputs.runner }}"'

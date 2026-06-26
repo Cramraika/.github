@@ -1,0 +1,57 @@
+# Reusable Ansible CI — yamllint + ansible-lint + --syntax-check.
+#
+#   jobs:
+#     ci:
+#       uses: Cramraika/.github/.github/workflows/ci-ansible.yml@main
+#       with:
+#         runner: ${{ vars.RUNNER_TYPE || 'ubuntu-latest' }}
+#         playbook: site.yml    # the entrypoint playbook to syntax-check
+name: Reusable Ansible CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label."
+        required: false
+        type: string
+        default: ubuntu-latest
+      playbook:
+        description: "Entrypoint playbook for --syntax-check (skips if absent)."
+        required: false
+        type: string
+        default: site.yml
+
+jobs:
+  ci:
+    name: Ansible CI
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ansible-lint + yamllint
+        run: pip install ansible ansible-lint yamllint
+
+      - name: yamllint
+        continue-on-error: true
+        run: yamllint . 2>&1 | tail -60 || true
+
+      - name: ansible-lint
+        continue-on-error: true
+        run: ansible-lint 2>&1 | tail -80 || true
+
+      - name: Syntax check (gate)
+        run: |
+          if [ -f "${{ inputs.playbook }}" ]; then
+            ansible-playbook --syntax-check "${{ inputs.playbook }}"
+          else
+            echo "No ${{ inputs.playbook }} — searching for any top-level playbook to syntax-check."
+            pb=$(ls *.yml *.yaml 2>/dev/null | head -1 || true)
+            if [ -n "$pb" ]; then ansible-playbook --syntax-check "$pb" || true; else echo "No playbook found — skipping."; fi
+          fi
