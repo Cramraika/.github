@@ -72,9 +72,21 @@ Callers reference `@main` (operator convention). Reusable-workflow changes land
 immediately on every caller — centralization is a single point of change. To land
 changes deliberately, a caller may pin a moving `@v1` tag instead.
 
-## Ownership boundary with the Renovate track
+## Renovate base-preset
 
-`renovate.yml` here is the **workflow shape only**. The `renovate.json` config +
-Renovate features (presets, package rules) are owned by the "Renovate full-leverage"
-track. Coordinate via the App-token convention (`RENOVATE_APP_ID` +
-`RENOVATE_APP_PRIVATE_KEY`).
+`renovate.json` at the repo root is the **fleet canonical Renovate base-preset**
+(ADR-033 Alternative B). Every repo carries a thin `renovate.json` that does
+`"extends": ["github>Cramraika"]` and inherits the full tiered automerge policy
+(patch/pin/digest + dev-minor auto-merge after CI; prod-minor + major -> PR +
+`needs-review`), the security feeds (OSV + GHSA, schedule-bypass), and the
+GitHub-Actions digest-pinning supply-chain rule. Per-repo configs add only their
+own overrides (monorepo branch-prefixes, ansible-galaxy specialization, OSS
+looser-minor). Single source kills the per-repo copy-paste drift.
+
+`renovate.yml` (the reusable workflow) is the **executor shape only**; this
+`renovate.json` is the **config**. Both coordinate via the App-token convention
+(`RENOVATE_APP_ID` + `RENOVATE_APP_PRIVATE_KEY`) -- the `vagary-renovate` App token
+(not the ephemeral `GITHUB_TOKEN`) is what makes automerge-after-CI and the
+vulnerability-alert path actually fire.
+
+Design: `platform-docs/docs/specs/2026-06-25-fleet-dependency-management-architecture.md`.
