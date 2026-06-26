@@ -30,13 +30,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # setup-python's hostedtoolcache download is unreliable on self-hosted Mac
+      # runners (the toolcache isn't provisioned like GitHub-hosted). Tolerate its
+      # failure and fall back to the runner's system python3.
       - name: Set up Python
+        id: setup-python
         uses: actions/setup-python@v5
+        continue-on-error: true
         with:
           python-version: "3.11"
 
+      - name: Ensure a usable Python (self-hosted fallback)
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            echo "::error::No python3 on PATH and setup-python failed."
+            exit 1
+          fi
+          python3 --version
+
       - name: Install ansible-lint + yamllint
-        run: pip install ansible ansible-lint yamllint
+        run: python3 -m pip install --user --upgrade ansible ansible-lint yamllint && echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: yamllint
         continue-on-error: true
