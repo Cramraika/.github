@@ -20,8 +20,12 @@ reusable workflow here, so CI/CD behavior is defined ONCE and inherited fleet-wi
 | `ci-ansible.yml` | yamllint + ansible-lint + `--syntax-check` gate | `runner`, `playbook` |
 | `security-scan.yml` | Trivy fs CVE (SARIF→Code Scanning) + gitleaks | `runner`, `blocking` |
 | `cosign-sign.yml` | image build + Cosign sign + CycloneDX SBOM attest | `runner`; secrets `COSIGN_PRIVATE_KEY`, `COSIGN_PASSWORD` |
-| `deploy-coolify.yml` | SSH-to-core-1 Coolify deploy bridge (**hard-pinned self-hosted**) | `coolify-app-uuid`, `force`; secret `COOLIFY_API_TOKEN` |
 | `renovate.yml` | self-hosted Renovate via vagary-renovate App token | `log-level`; secrets `RENOVATE_APP_ID`, `RENOVATE_APP_PRIVATE_KEY` |
+
+> Deploy bridges that embed host-specific substrate (e.g. the Coolify SSH bridge) are
+> intentionally NOT hosted in this public repo — they have a single private consumer, so
+> they live in that consumer repo (or a private reusable home if a second consumer
+> appears, with infra literals parameterized as secrets).
 
 ## The two load-bearing conventions
 
@@ -43,13 +47,13 @@ repo-scoped on a User account and only 5 repos have one registered (vps-ansible,
 host_page, vagary-voice, vagary-platform, unified-journey-guide). `runs-on:
 self-hosted` on a runner-less repo hangs forever.
 
-### 2. The deploy bridge is HARD-PINNED — a repo var must never re-break it
+### 2. Deploy bridges are HARD-PINNED — a repo var must never re-break them
 
-`deploy-coolify.yml` pins `runs-on: self-hosted` with **no runner input**. It needs
-the operator-Mac substrate (SSH key + core-1:2222 reachability, which firewalls off
-GitHub-hosted ranges). Setting `RUNNER_TYPE=ubuntu-latest` silently broke every
-host_page deploy 2026-05-31 → 06-04 (no key, port-2222 timeout). CI may follow
-`RUNNER_TYPE`; the deploy job may not.
+A deploy job that needs the operator-Mac substrate pins `runs-on: self-hosted` with
+**no runner input**. Setting `RUNNER_TYPE=ubuntu-latest` once silently broke every
+deploy of such a repo (the GitHub-hosted runner has no SSH key / no reachability). CI
+may follow `RUNNER_TYPE`; a substrate-bound deploy job may not. These bridges live in
+their consumer repo, not here.
 
 ## Caller examples
 
