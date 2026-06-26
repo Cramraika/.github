@@ -46,10 +46,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # setup-node's runtime download is unreliable on self-hosted Mac runners.
+      # Tolerate its failure and fall back to the runner's system node.
       - name: Set up Node
+        id: setup-node
         uses: actions/setup-node@v4
+        continue-on-error: true
         with:
           node-version: ${{ inputs.node-version }}
+
+      - name: Ensure a usable Node (self-hosted fallback)
+        run: |
+          if ! command -v node >/dev/null 2>&1; then
+            echo "::error::No node on PATH and setup-node failed."
+            exit 1
+          fi
+          node --version && npm --version
 
       - name: Install dependencies
         run: |
