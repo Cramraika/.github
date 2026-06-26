@@ -74,17 +74,24 @@ changes deliberately, a caller may pin a moving `@v1` tag instead.
 
 ## Renovate base-preset
 
-`renovate.json` at the repo root is the **fleet canonical Renovate base-preset**
-(ADR-033 Alternative B). Every repo carries a thin `renovate.json` that does
-`"extends": ["github>Cramraika"]` and inherits the full tiered automerge policy
+`default.json` at the repo root is the **fleet canonical Renovate base-preset**
+(ADR-033 Alternative B). Every repo carries a thin `.github/renovate.json` that does
+`"extends": ["github>Cramraika/.github"]` and inherits the full tiered automerge policy
 (patch/pin/digest + dev-minor auto-merge after CI; prod-minor + major -> PR +
 `needs-review`), the security feeds (OSV + GHSA, schedule-bypass), and the
 GitHub-Actions digest-pinning supply-chain rule. Per-repo configs add only their
 own overrides (monorepo branch-prefixes, ansible-galaxy specialization, OSS
 looser-minor). Single source kills the per-repo copy-paste drift.
 
+The preset is named `default.json` (Renovate's idiomatic preset filename) and the
+reference names the explicit repo (`github>Cramraika/.github`) — the bare
+`github>Cramraika` shorthand resolves to a non-existent `Cramraika/renovate-config`
+repo, NOT `.github`, and Renovate's default preset filename is `default.json` not
+`renovate.json` (both verified live 2026-06-26 — a renovate run failed with
+`Cannot find preset's package (github>Cramraika)` before the fix).
+
 `renovate.yml` (the reusable workflow) is the **executor shape only**; this
-`renovate.json` is the **config**. Both coordinate via the App-token convention
+`default.json` is the **config**. Both coordinate via the App-token convention
 (`RENOVATE_APP_ID` + `RENOVATE_APP_PRIVATE_KEY`) -- the `vagary-renovate` App token
 (not the ephemeral `GITHUB_TOKEN`) is what makes automerge-after-CI and the
 vulnerability-alert path actually fire.
