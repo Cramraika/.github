@@ -52,7 +52,28 @@ jobs:
           node-version: ${{ inputs.node-version }}
 
       - name: Install dependencies
-        run: npm install --no-audit --prefer-offline 2>/dev/null || npm install --legacy-peer-deps --no-audit
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --prefer-offline 2>/dev/null || npm install --no-audit --prefer-offline 2>/dev/null || npm install --legacy-peer-deps --no-audit
+          else
+            npm install --no-audit --prefer-offline 2>/dev/null || npm install --legacy-peer-deps --no-audit
+          fi
+
+      - name: Lint (if script present)
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.lint ? 0 : 1)" 2>/dev/null; then
+            npm run lint
+          else
+            echo "No lint script — skipping."
+          fi
+
+      - name: Typecheck (if script present)
+        run: |
+          if node -e "process.exit(require('./package.json').scripts?.typecheck ? 0 : 1)" 2>/dev/null; then
+            npm run typecheck
+          else
+            echo "No typecheck script — skipping."
+          fi
 
       - name: Build
         run: npm run build --if-present
