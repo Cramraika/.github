@@ -42,19 +42,19 @@
   },
   "packageRules": [
     {
-      "description": "Auto-merge patch/pin/digest everywhere (after CI)",
+      "description": "Auto-merge patch/pin/digest everywhere (after CI). platformAutomerge:false so the vagary-renovate App token does the merge ($0, no GitHub-native auto-merge); automergeType:pr so the merge produces an auditable bot-merged PR.",
       "matchUpdateTypes": ["patch", "pin", "digest"],
       "automerge": true,
-      "automergeType": "branch",
-      "platformAutomerge": true
+      "automergeType": "pr",
+      "platformAutomerge": false
     },
     {
-      "description": "Auto-merge dev-dependency minor (after CI)",
+      "description": "Auto-merge dev-dependency minor (after CI). Bot-token merge (platformAutomerge:false), PR artifact.",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor"],
       "automerge": true,
-      "automergeType": "branch",
-      "platformAutomerge": true
+      "automergeType": "pr",
+      "platformAutomerge": false
     },
     {
       "description": "Production minor -> PR + review (NO automerge)",
