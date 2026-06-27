@@ -53,7 +53,7 @@ jobs:
           GITLEAKS_ENABLE_SUMMARY: "true"
 
       - name: Trivy fs scan (table, advisory)
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
           scan-type: fs
@@ -64,7 +64,7 @@ jobs:
           exit-code: ${{ inputs.blocking && '1' || '0' }}
 
       - name: Trivy fs scan (SARIF)
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
           scan-type: fs
