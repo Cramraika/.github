@@ -62,7 +62,12 @@ jobs:
           private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
 
       - name: Self-hosted Renovate
-        uses: renovatebot/github-action@v42.0.9
+        uses: renovatebot/github-action@v46.1.17  # 2026-08-18: was `@v42.0.9`, which DOES NOT EXIST —
+        # the 42.0.x series stops at v42.0.6 (repo has 1513 tags, none is v42.0.9). GitHub cannot
+        # resolve the action, so the whole Renovate job died before any step, every week, silently.
+        # Aligned to v46.1.17 rather than the nearest-existing v42.0.6: the step's inputs and env
+        # are byte-identical to n8n-workflows' working v46.1.17 usage, so the bump is drop-in, and
+        # this file is the org template — a scaffold should inherit the version the fleet runs.
         with:
           configurationFile: ${{ inputs.config-file }}
           token: ${{ steps.app-token.outputs.token }}
