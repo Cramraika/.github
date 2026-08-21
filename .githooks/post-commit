@@ -50,6 +50,12 @@ if command -v semgrep >/dev/null 2>&1; then
 _ss_run_bounded semgrep scan --config p/secrets --quiet \
             --error --json --output "$_SS_JSON" . \
             >/dev/null 2>&1
+        # CAPTURED HERE, not after the reaper below. `$?` holds the status of the LAST command run, so
+        # reading it after `_ss_reap_orphans` recorded the REAPER's exit code -- which is ~always 0 --
+        # and the `[ "$_SS_RC" -ne 0 ]` branch then tested the wrong thing. Findings still surfaced via
+        # the JSON count, but a scan that TIMED OUT or errored with no artifact read as clean: the
+        # could-not-scan / scanned-and-found-nothing conflation, where it is least visible.
+        _SS_RC=$?
         # `timeout` signals its direct child (the pysemgrep wrapper), not semgrep-core, which is a
         # grandchild -- so semgrep-core survives the bound, is reparented to init, and keeps burning
         # CPU with its output going to a file nobody will read. ppid=1 is the test: no parent means
@@ -60,7 +66,6 @@ _ss_run_bounded semgrep scan --config p/secrets --quiet \
           done
         }
         _ss_reap_orphans
-        _SS_RC=$?
         # Count findings from the JSON artifact (robust even if exit-code semantics drift).
         _SS_N=0
         if [ -s "$_SS_JSON" ] && command -v python3 >/dev/null 2>&1; then
