@@ -1,0 +1,87 @@
+#!/bin/sh
+# post-commit hook — created by install-secrets-scan-hook.sh (OW-500)
+
+# >>> secrets-scan-block v42 (OW-500) >>>
+# Post-commit semgrep p/secrets scan → DURABLE LOG-ONLY findings artifact (NO mac notification).
+# v37 (2026-07-07, operator): the macOS osascript notification was noise — post-commit is too LATE
+# (the secret is already committed) and the authoritative gate is CI (security-scan.yml + semgrep.yml),
+# so real secrets are caught there and blocked from merge. This local hook keeps only a quiet append-only
+# LOG (`~/.cache/semgrep-secrets-findings/findings.log`) for local awareness — no popups. The genuine
+# prevention belongs in a PRE-commit gate (gitleaks, fast) + CI; a post-commit popup is neither.
+#
+# FIREWALL-SAFE: writes only to the operator's LOCAL log. It NEVER posts matched secret content / file
+# paths to any personal channel (Slack/etc.), safe in work-firewalled repos per OW-308.
+if command -v semgrep >/dev/null 2>&1; then
+    _SS_REPO="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
+    _SS_DIR="${HOME}/.cache/semgrep-secrets-findings"
+    _SS_TS="$(date +%Y%m%dT%H%M%S)"
+    _SS_JSON="${_SS_DIR}/${_SS_REPO}-${_SS_TS}.json"
+    _SS_LOG="${_SS_DIR}/findings.log"
+    mkdir -p "$_SS_DIR"
+    (
+        # --error => exit 1 when findings exist; --json/--output => durable artifact.
+        # NB: --no-git-ignore is a BARE flag (the v35 `--no-git-ignore=false` was a
+        # usage error -> semgrep exited 2 and never actually scanned). We omit it so
+        # the default --use-git-ignore behavior applies (scans tracked files).
+        # BOUNDED (v39): a local awareness scan that runs for tens of minutes is no longer a
+        # signal, it is a CPU leak -- two orphaned semgrep-core processes (parent dead, output
+        # unreadable) held 103% CPU each and starved the self-hosted CI runner. SIGTERM does not
+        # stop semgrep-core; -k escalates to SIGKILL, which does.
+        _SS_TMO="$(command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null)"
+                  # A lock that depends on a binary the hook cannot see is not a lock. flock lives in
+          # /opt/homebrew/bin; a detached hook runs with /usr/gnu/bin:/usr/local/bin:/bin:/usr/bin
+          # and never found it, so every scan took the unlocked path while the code read as
+          # correct. mkdir is atomic everywhere and needs nothing on PATH.
+          _SS_LOCK="/tmp/fleet-semgrep-postcommit.lock.d"
+          _ss_lock_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+          _ss_lock_acquire() {
+            if [ -d "$_SS_LOCK" ]; then
+              _age=$(( $(date +%s) - $(_ss_lock_mtime "$_SS_LOCK") ))
+              # 660 = the 600s scan bound plus slack; past that the holder is gone, not slow
+              [ "$_age" -gt 660 ] && rmdir "$_SS_LOCK" 2>/dev/null
+            fi
+            mkdir "$_SS_LOCK" 2>/dev/null
+          }
+          _ss_run_bounded() { if [ -n "$_SS_TMO" ]; then "$_SS_TMO" -k 30 600 "$@"; else "$@"; fi; }
+          if ! _ss_lock_acquire; then
+            exit 0   # another repo is scanning; this hook is awareness, so skip rather than queue
+          fi
+          trap 'rmdir "$_SS_LOCK" 2>/dev/null' EXIT INT TERM
+_ss_run_bounded semgrep scan --config p/secrets --quiet \
+            --error --json --output "$_SS_JSON" . \
+            >/dev/null 2>&1
+        # `timeout` signals its direct child (the pysemgrep wrapper), not semgrep-core, which is a
+        # grandchild -- so semgrep-core survives the bound, is reparented to init, and keeps burning
+        # CPU with its output going to a file nobody will read. ppid=1 is the test: no parent means
+        # no consumer. A scan with a live parent is never touched.
+        _ss_reap_orphans() {
+          for _op in $(pgrep -f 'semgrep-core' 2>/dev/null); do
+            [ "$(ps -o ppid= -p "$_op" 2>/dev/null | tr -d ' ')" = "1" ] && kill -9 "$_op" 2>/dev/null
+          done
+        }
+        _ss_reap_orphans
+        _SS_RC=$?
+        # Count findings from the JSON artifact (robust even if exit-code semantics drift).
+        _SS_N=0
+        if [ -s "$_SS_JSON" ] && command -v python3 >/dev/null 2>&1; then
+            _SS_N=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1])).get('results',[])))" "$_SS_JSON" 2>/dev/null || echo 0)
+        fi
+        if [ "$_SS_RC" -ne 0 ] || [ "${_SS_N:-0}" -gt 0 ]; then
+            # Durable, append-only marker — survives the detached subshell. Records the
+            # repo + commit + count + artifact path. Does NOT record the secret value.
+            printf '%s  repo=%s  commit=%s  findings=%s  artifact=%s
+' \
+                "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+                "$_SS_REPO" \
+                "$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" \
+                "${_SS_N:-?}" \
+                "$_SS_JSON" >> "$_SS_LOG"
+            # v37: LOG-ONLY — no macOS notification (post-commit popups are noise; CI is the gate).
+        else
+            # No findings: discard the empty artifact to avoid clutter.
+            rm -f "$_SS_JSON" 2>/dev/null || true
+        fi
+    ) >/dev/null 2>&1 &
+    disown 2>/dev/null || true
+fi
+# <<< secrets-scan-block v42 (OW-500) <<<
