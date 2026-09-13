@@ -11,6 +11,16 @@
 #
 # FIREWALL-SAFE: writes only to the operator's LOCAL log. It NEVER posts matched secret content / file
 # paths to any personal channel (Slack/etc.), safe in work-firewalled repos per OW-308.
+# >>> post-commit admission (install-post-commit-admission.sh) >>>
+# Skip the advisory analysis chain below while the workstation is memory- or load-stalled. Logged to
+# ~/.cache/post-commit-admission.log. It never blocks the commit (post-commit cannot) and is a no-op on
+# any machine without the admission script. Why: 2026-09-13/14 the workstation reached load 614 and 209
+# with swap under 1.5 GB while agent sessions committed, each commit launching ~10 detached analyses.
+if [ -x "$HOME/.claude/scripts/post-commit-admit.sh" ] && ! "$HOME/.claude/scripts/post-commit-admit.sh" "$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"; then
+    exit 0
+fi
+# <<< post-commit admission <<<
+
 if command -v semgrep >/dev/null 2>&1; then
     _SS_REPO="$(basename "$(git rev-parse --show-toplevel 2>/dev/null || pwd)")"
     _SS_DIR="${HOME}/.cache/semgrep-secrets-findings"
